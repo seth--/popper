@@ -118,6 +118,11 @@ class Popper():
         # Parse argv
         parser = argparse.ArgumentParser(description='')
         parser.add_argument('url', type=str, help='an integer for the accumulator')
+        parser.add_argument('--postfields', type=str, help='encoded post data. Implies --post')
+        parser.add_argument('--head', action='store_true', help='uses HEAD method') #TODO: make these mutually exclusive
+        parser.add_argument('--post', action='store_true', help='uses POST method')
+        parser.add_argument('--get', action='store_true', help='uses GET method')
+        parser.add_argument('--method', type=str, help='custom http method, useful for DELETE or PUT (see CURLOPT_CUSTOMREQUEST)')
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
@@ -129,6 +134,14 @@ class Popper():
         args = vars(parser.parse_args())
 
         curl_opts = [(pycurl.PROXY, args['proxy'])]
+        if args['method']:
+            curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
+        curl_opts.append((pycurl.POST, args['post']))
+        curl_opts.append((pycurl.HTTPGET, args['get']))
+        curl_opts.append((pycurl.NOBODY, args['head']))
+        if args['postfields']:
+            curl_opts.append((pycurl.POSTFIELDS, args['postfields']))
+
 
         self._hidden_results = 0
         job_pool = Queue.Queue(args['threads'] * 10)
