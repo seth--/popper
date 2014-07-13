@@ -23,7 +23,7 @@ NO_URLS_LEFT = False
 
 class WorkerThread(threading.Thread):
 
-    def __init__(self, job_pool, result_list, filter_list, maximum_retries):
+    def __init__(self, job_pool, result_list, filter_list, maximum_retries, curl_opts):
         super(WorkerThread, self).__init__()
         self._job_pool = job_pool
         self._result_list = result_list
@@ -34,6 +34,8 @@ class WorkerThread(threading.Thread):
         self._curl = pycurl.Curl()
         self._curl.setopt(pycurl.WRITEFUNCTION, self._write_data)
         self._curl.setopt(pycurl.HEADER, True)
+        for opt, value in curl_opts:
+            self._curl.setopt(opt, value)
 
     #Callback for curl
     def _write_data(self, buffer):
@@ -51,6 +53,7 @@ class WorkerThread(threading.Thread):
                     self._curl.perform()
                 except pycurl.error:
                     retries -= 1
+                    print retries
                     if retries == 0:
                         print 'Giving up on ' + job #TODO: this should be counted
                 else:
@@ -65,10 +68,9 @@ class WorkerThread(threading.Thread):
                                                'code': self._curl.getinfo(pycurl.RESPONSE_CODE),
                                                'size': len(self._curl_buffer),
                                                'lines': self._curl_buffer.count("\n")})
-                finally:
-                    self._curl_buffer = ''
-                    self._job_pool.task_done()
-                    job = self._job_pool.get()
+            self._curl_buffer = ''
+            self._job_pool.task_done()
+            job = self._job_pool.get()
         self._curl.close()
         self._job_pool.task_done()
 
@@ -118,12 +120,15 @@ class Popper():
         parser.add_argument('url', type=str, help='an integer for the accumulator')
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
+        parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
         parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
         for payload_name in PAYLOAD_MAPING:
             parser.add_argument('--' + payload_name, type=str, default='', nargs='*', help=PAYLOAD_MAPING[payload_name].CLI_HELP)
         for filter_name in FILTER_MAPING:
             FILTER_MAPING[filter_name].set_arguments(parser) #TODO: payloads should have this too
         args = vars(parser.parse_args())
+
+        curl_opts = [(pycurl.PROXY, args['proxy'])]
 
         self._hidden_results = 0
         job_pool = Queue.Queue(args['threads'] * 10)
@@ -142,7 +147,7 @@ class Popper():
             except IndexError:
                 pass
         for x in xrange(args['threads']):
-           WorkerThread(job_pool, result_list, filter_list, args['retry']).start()
+           WorkerThread(job_pool, result_list, filter_list, args['retry'], curl_opts).start()
 
         # Add all the urls to the queue
         for x in self.generate_urls(args['url'], args):
