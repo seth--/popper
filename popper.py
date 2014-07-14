@@ -131,7 +131,9 @@ class Popper():
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
         parser.add_argument('--timeout', type=int, default=0, help='timeout in seconds')
-        parser.add_argument('--connecttimeout', type=int, default=0, help='timeout in seconds for the connection phase')
+        parser.add_argument('--connect-timeout', type=int, default=0, help='timeout in seconds for the connection phase')
+        parser.add_argument('--fresh', action='store_true', help='don\'t reuse connections')
+        parser.add_argument('--no-verify', action='store_true', help='ignore SSL errors')
 
         for payload_name in PAYLOAD_MAPING:
             parser.add_argument('--' + payload_name, type=str, default='', nargs='*', help=PAYLOAD_MAPING[payload_name].CLI_HELP)
@@ -140,13 +142,17 @@ class Popper():
 
         args = vars(parser.parse_args())
 
+        print args
         curl_opts = [(pycurl.HTTPGET, args['get']),
                      (pycurl.POST, args['post']),
                      (pycurl.NOBODY, args['head']),
                      (pycurl.HTTPHEADER, args['header']),
                      (pycurl.PROXY, args['proxy']),
                      (pycurl.TIMEOUT, args['timeout']),
-                     (pycurl.CONNECTTIMEOUT, args['connecttimeout'])]
+                     (pycurl.CONNECTTIMEOUT, args['connect_timeout']),
+                     (pycurl.FORBID_REUSE, args['fresh']),
+                     (pycurl.SSL_VERIFYPEER, (0 if args['no_verify'] else 1)),
+                     (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]
         if args['postfields']: #This goes after --get, --post and --head
             curl_opts.append((pycurl.POSTFIELDS, args['postfields']))
         if args['method']:
