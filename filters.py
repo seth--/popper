@@ -51,7 +51,7 @@ class Time(BaseFilter):
 class Lines(BaseFilter):
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--hl', type=int, default=None, nargs='*', help='hide results with X lines (--hl 5 6 78)') #TODO add support for "X or longer"
+        parser.add_argument('--hl', type=int, default=None, nargs='*', help='hide results with X lines (--hl 5 6 78)')
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
@@ -67,7 +67,7 @@ class Lines(BaseFilter):
 class LinesOrMore(BaseFilter):
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--hl+', type=int, default=None, help='hide results with more than X lines (--hl+ 20)') #TODO add support for "X or longer"
+        parser.add_argument('--hl+', type=int, default=None, help='hide results with more than X lines (--hl+ 20)')
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
