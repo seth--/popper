@@ -107,3 +107,20 @@ Now we will be using [range] to find some numeric ids and --threads 30 to speed 
     301 11   438      0.589926 http://localhost/poppertest/wordpress/?author=844
 
     Hidden: 981
+
+
+### Other protocols
+It may work with other protocols supported by libcurl
+    $ python2 popper.py 'ftp://localhost/[file]/' --file testdic 
+    Giving up on ftp://localhost/qwe/: Server denied you to change to the given directory
+    Giving up on ftp://localhost/dddddd/: Server denied you to change to the given directory
+    226 1    61       0.18242  ftp://localhost/somefolder/
+    Giving up on ftp://localhost/asd/: Server denied you to change to the given directory
+    226 182  13521    0.257413 ftp://localhost/otherfolder/
+
+    $ python2 popper.py 'gopher://localhost/1/[file]/' --file testdic 
+    0   1    57       0.383794 gopher://localhost/1/asd/
+    0   2    167      0.397954 gopher://localhost/1/Internet/
+    0   1    60       0.407395 gopher://localhost/1/dddddd/
+    0   16   1124     0.400861 gopher://localhost/1/Computers/
+    0   1    57       0.4052   gopher://localhost/1/qwe/
