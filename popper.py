@@ -51,11 +51,10 @@ class WorkerThread(threading.Thread):
             while (retries > 0) or (self._maximum_retries == 0): # self._maximum_retries == 0 means unlimited retries
                 try:
                     self._curl.perform()
-                except pycurl.error:
+                except pycurl.error, e:
                     retries -= 1
-                    print retries
                     if retries == 0:
-                        print 'Giving up on ' + job #TODO: this should be counted
+                        print 'Giving up on ' + job + ': ' + e[1] + "\n", #TODO: this should be counted
                 else:
                     retries = 0
                     for filter in self._filter_list:
@@ -94,11 +93,14 @@ class Popper():
         if result == False:
             self._hidden_results += 1
         else:
-            print str(result['code']).ljust(3),
-            print str(result['lines']).ljust(4), # TODO: this should /1000 and add 'k' to save space
-            print str(result['size']).ljust(8), # TODO: this should use kb, mb, etc to save space
-            print str(result['time']).ljust(8), #TODO: what happens with long waits here? also, the format is wrong
-            print result['url']
+            # TODO: lines should be /1000 and add 'k' to save space
+            # TODO: size should use kb, mb, etc to save space
+            # TODO: what happens with long waits in time? also, the format is wrong
+            print str(result['code']).ljust(3) + ' ' + \
+                  str(result['lines']).ljust(4) + ' ' + \
+                  str(result['size']).ljust(8) + ' ' + \
+                  str(result['time']).ljust(8) + ' ' + \
+                  result['url'] + "\n",
 
     #Prints results while waiting to add a job
     def put_job_and_print(self, result_list, job_pool, job):
