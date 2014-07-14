@@ -14,7 +14,7 @@ class Code(BaseFilter):
     #parser=an argparse.ArgumentParser object
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--hc', type=int, default=[], nargs='*', help='HTTP result codes to hide (--hc 404 403)')
+        parser.add_argument('--hc', type=int, default=None, nargs='*', help='HTTP result codes to hide (--hc 404 403)')
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
@@ -35,7 +35,7 @@ class Code(BaseFilter):
 class Time(BaseFilter):
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--ht', type=int, help='Hide requests which took less than X seconds (--ht X)')
+        parser.add_argument('--ht', type=int, default=None, help='hide requests which took less than X seconds (--ht 2)')
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
@@ -51,7 +51,7 @@ class Time(BaseFilter):
 class Lines(BaseFilter):
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--hl', type=int, default=[], nargs='*', help='Hide results with X lines (--hl X)') #TODO add support for "X or longer"
+        parser.add_argument('--hl', type=int, default=None, nargs='*', help='hide results with X lines (--hl 5 6 78)') #TODO add support for "X or longer"
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
@@ -64,7 +64,24 @@ class Lines(BaseFilter):
         return not file.count("\n") in self._lines
 
 
+class LinesOrMore(BaseFilter):
+    @staticmethod
+    def set_arguments(parser):
+        parser.add_argument('--hl+', type=int, default=None, help='hide results with more than X lines (--hl+ 20)') #TODO add support for "X or longer"
+
+    def __init__(self, vars):
+        BaseFilter.__init__(self)
+        try:
+            self._lines = vars
+        except:
+            raise InvalidVar
+
+    def filter(self, url, curl, file):
+        return not (file.count("\n") > self._lines)
+
+
 FILTER_MAPING = {'hc': Code,
                  'ht': Time,
-                 'hl': Lines}
+                 'hl': Lines,
+                 'hl+': LinesOrMore}
 

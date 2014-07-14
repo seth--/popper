@@ -172,10 +172,12 @@ class Popper():
         for filter_name in FILTER_MAPING:
             try:
                 arg = args[filter_name]
-                filter = FILTER_MAPING[filter_name](arg)
-                if filter_name in args['negate']:
-                        filter.negate = True
-                filter_list.append(filter)
+                if arg != None:
+                    filter = FILTER_MAPING[filter_name](arg)
+                    if filter_name in args['negate']:
+                            filter.negate = True
+                    print(filter_name)
+                    filter_list.append(filter)
             except IndexError:
                 pass
         for x in xrange(args['threads']):
