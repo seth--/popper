@@ -7,6 +7,7 @@
 # https://docs.python.org/2/library/argparse.html#module-argparse
 # http://www.ibm.com/developerworks/library/os-curl/index.html
 
+from __future__ import print_function
 import Queue
 import threading
 import argparse
@@ -14,6 +15,7 @@ import re
 import time
 import copy
 import pycurl
+import sys
 
 from payloads import PAYLOAD_MAPING
 from filters import FILTER_MAPING
@@ -55,7 +57,7 @@ class WorkerThread(threading.Thread):
                 except pycurl.error, e:
                     retries -= 1
                     if retries == 0:
-                        print 'Giving up on ' + job + ': ' + e[1] + "\n", #TODO: this should be counted
+                        print('Giving up on ' + job + ': ' + e[1], file=sys.stderr) #TODO: this should be counted
                 else:
                     retries = 0
                     for filter in self._filter_list:
@@ -97,11 +99,11 @@ class Popper():
             # TODO: lines should be /1000 and add 'k' to save space
             # TODO: size should use kb, mb, etc to save space
             # TODO: what happens with long waits in time? also, the format is wrong
-            print str(result['code']).ljust(3) + ' ' + \
+            print(str(result['code']).ljust(3) + ' ' + \
                   str(result['lines']).ljust(4) + ' ' + \
                   str(result['size']).ljust(8) + ' ' + \
                   str(result['time']).ljust(8) + ' ' + \
-                  result['url'] + "\n",
+                  result['url'])
 
     #Prints results while waiting to add a job
     def put_job_and_print(self, result_list, job_pool, job):
@@ -201,7 +203,7 @@ class Popper():
         while result_list.empty() == False:
             self.print_result(result_list.get_nowait())
 
-        print "\nHidden: " + str(self._hidden_results)
+        print("\nHidden: " + str(self._hidden_results))
 
 
 Popper()
