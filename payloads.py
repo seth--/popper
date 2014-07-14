@@ -43,7 +43,9 @@ class File():
 
     def get_data(self):
         for x in self._f:
-            x = x[:-1] #TODO: should use x.rstrip()?
+            x = x[:-1] # remove \n
+            if x[:-1] == "\r": # remove \r if present
+                x = x[:-1]
             if x:
                 yield x
         self._f.close()
