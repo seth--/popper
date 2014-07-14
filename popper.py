@@ -142,7 +142,6 @@ class Popper():
 
         args = vars(parser.parse_args())
 
-        print args
         curl_opts = [(pycurl.HTTPGET, args['get']),
                      (pycurl.POST, args['post']),
                      (pycurl.NOBODY, args['head']),
