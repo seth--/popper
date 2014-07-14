@@ -34,6 +34,7 @@ class WorkerThread(threading.Thread):
         self._curl = pycurl.Curl()
         self._curl.setopt(pycurl.WRITEFUNCTION, self._write_data)
         self._curl.setopt(pycurl.HEADER, True)
+        self._curl.setopt(pycurl.NOSIGNAL, True)
         for opt, value in curl_opts:
             self._curl.setopt(opt, value)
 
