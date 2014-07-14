@@ -119,31 +119,38 @@ class Popper():
         parser = argparse.ArgumentParser(description='')
         parser.add_argument('url', type=str, help='an integer for the accumulator')
         parser.add_argument('--postfields', type=str, help='encoded post data. Implies --post')
-        parser.add_argument('--head', action='store_true', help='uses HEAD method') #TODO: make these mutually exclusive
-        parser.add_argument('--post', action='store_true', help='uses POST method')
         parser.add_argument('--get', action='store_true', help='uses GET method')
+        parser.add_argument('--post', action='store_true', help='uses POST method')
+        parser.add_argument('--head', action='store_true', help='uses HEAD method') #TODO: make these mutually exclusive
         parser.add_argument('--header', type=str, default=[], nargs='*', help='extra http headers (--header "foo: bar" "baz: qux")')
         parser.add_argument('--method', type=str, help='custom http method, useful for DELETE or PUT (see CURLOPT_CUSTOMREQUEST)')
+
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
+        parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
+
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
-        parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
+        parser.add_argument('--timeout', type=int, default=0, help='timeout in seconds')
+        parser.add_argument('--connecttimeout', type=int, default=0, help='timeout in seconds for the connection phase')
+
         for payload_name in PAYLOAD_MAPING:
             parser.add_argument('--' + payload_name, type=str, default='', nargs='*', help=PAYLOAD_MAPING[payload_name].CLI_HELP)
         for filter_name in FILTER_MAPING:
             FILTER_MAPING[filter_name].set_arguments(parser) #TODO: payloads should have this too
+
         args = vars(parser.parse_args())
 
-        curl_opts = [(pycurl.PROXY, args['proxy'])]
+        curl_opts = [(pycurl.HTTPGET, args['get']),
+                     (pycurl.POST, args['post']),
+                     (pycurl.NOBODY, args['head']),
+                     (pycurl.HTTPHEADER, args['header']),
+                     (pycurl.PROXY, args['proxy']),
+                     (pycurl.TIMEOUT, args['timeout']),
+                     (pycurl.CONNECTTIMEOUT, args['connecttimeout'])]
+        if args['postfields']: #This goes after --get, --post and --head
+            curl_opts.append((pycurl.POSTFIELDS, args['postfields']))
         if args['method']:
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
-        curl_opts.append((pycurl.POST, args['post']))
-        curl_opts.append((pycurl.HTTPGET, args['get']))
-        curl_opts.append((pycurl.NOBODY, args['head']))
-        if args['postfields']:
-            curl_opts.append((pycurl.POSTFIELDS, args['postfields']))
-        curl_opts.append((pycurl.HTTPHEADER, args['header']))
-
 
         self._hidden_results = 0
         job_pool = Queue.Queue(args['threads'] * 10)
