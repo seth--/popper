@@ -39,8 +39,6 @@ class WorkerThread(threading.Thread):
         self._curl_buffer += buffer
 
     def run(self):
-        global result_list
-
         job = self._job_pool.get()
         while (job != NO_URLS_LEFT):
             self._curl.setopt(pycurl.URL, job['url'])
