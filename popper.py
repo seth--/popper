@@ -1,12 +1,3 @@
-# http://pycurl.sourceforge.net/doc/index.html
-# http://curl.haxx.se/libcurl/c/
-# https://github.com/pycurl/pycurl/blob/master/examples/retriever-multi.py
-# http://www.devshed.com/c/a/Python/Basic-Threading-in-Python/
-# https://docs.python.org/2/library/thread.html
-# https://docs.python.org/2/library/queue.html#module-Queue
-# https://docs.python.org/2/library/argparse.html#module-argparse
-# http://www.ibm.com/developerworks/library/os-curl/index.html
-
 from __future__ import print_function
 import Queue
 import threading
