@@ -12,6 +12,8 @@ from payloads import PAYLOAD_MAPING
 from filters import FILTER_MAPING
 
 NO_URLS_LEFT = False
+JOB_STATUS_HIDDEN = 1
+JOB_STATUS_ABORTED = 2
 
 
 class WorkerThread(threading.Thread):
@@ -53,12 +55,13 @@ class WorkerThread(threading.Thread):
                 except pycurl.error, e:
                     retries -= 1
                     if retries == 0:
-                        print('Giving up on ' + job['url'] + ': ' + e[1] + "\n", end='', file=sys.stderr) #TODO: this should be counted
+                        print('Giving up on ' + job['url'] + ': ' + e[1] + "\n", end='', file=sys.stderr)
+                        self._result_list.put(JOB_STATUS_ABORTED)
                 else:
                     retries = 0
                     for filter in self._filter_list:
                         if (not filter.filter(job['url'], self._curl, self._curl_buffer)) != filter.negate: # != is logical xor for booleans
-                            self._result_list.put(False)
+                            self._result_list.put(JOB_STATUS_HIDDEN)
                             break
                     else:
                         self._result_list.put({'url': job['url'],
@@ -97,8 +100,10 @@ class Popper():
             yield {'url': url_template, 'post_data': post_data_template}
 
     def print_result(self, result):
-        if result == False:
+        if result == JOB_STATUS_HIDDEN:
             self._hidden_results += 1
+        elif result == JOB_STATUS_ABORTED:
+            self._aborted_jobs += 1
         else:
             # TODO: lines should be /1000 and add 'k' to save space
             # TODO: size should use kb, mb, etc to save space
@@ -169,6 +174,7 @@ class Popper():
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
 
         self._hidden_results = 0
+        self._aborted_jobs = 0
         job_pool = Queue.Queue(args['threads'] * 10)
         result_list = Queue.Queue(0)
 
@@ -228,6 +234,8 @@ class Popper():
             self.print_result(result_list.get_nowait())
 
         print("\nHidden: " + str(self._hidden_results) + "\n", end='')
+        if self._aborted_jobs > 0:
+            print("Aborted jobs: " + str(self._aborted_jobs) + "\n", end='')
 
 
 Popper()
