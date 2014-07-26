@@ -12,6 +12,7 @@ from payloads import PAYLOAD_MAPING
 from filters import FILTER_MAPING
 
 NO_URLS_LEFT = False
+POST_DATA_NOT_SENT = False
 JOB_STATUS_HIDDEN = 1
 JOB_STATUS_ABORTED = 2
 
@@ -42,11 +43,15 @@ class WorkerThread(threading.Thread):
         job = self._job_pool.get()
         while (job != NO_URLS_LEFT):
             self._curl.setopt(pycurl.URL, job['url'])
-            if job['post_data'] != False:
-                self._curl.setopt(pycurl.POSTFIELDS, job['post_data']) # This must be set after pycurl.HTTPGET, pycurl.POST and pycurl.NOBODY
-            retries = self._maximum_retries # Restart retry counter
+            if job['post_data'] != POST_DATA_NOT_SENT:
+                # This must be set after pycurl.HTTPGET, pycurl.POST and pycurl.NOBODY
+                self._curl.setopt(pycurl.POSTFIELDS, job['post_data']) 
+            # Restart retry counter
+            retries = self._maximum_retries
+
             while ((retries > 0) or (self._maximum_retries == 0)) and \
                 (not self._abort_event.is_set()): # self._maximum_retries == 0 means unlimited retries
+                
                 try:
                     self._curl.perform()
                 except pycurl.error, e:
@@ -84,7 +89,7 @@ class Popper():
             for data in p.get_data():
                 for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)): #TODO: deepcopy() just works. Probably something is wrong
                     yield {'url': x['url'], 'post_data': x['post_data']}
-        elif post_data_template != False:
+        elif post_data_template != POST_DATA_NOT_SENT:
             match = re.search(regex, post_data_template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
@@ -166,7 +171,7 @@ class Popper():
         if args['postdata']:
             post_data = args['postdata']
         else:
-            post_data = False
+            post_data = POST_DATA_NOT_SENT
         if args['method']:
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
 
@@ -197,8 +202,8 @@ class Popper():
 
             # Add the base url to the queue
             regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
-            if post_data == False:
-                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': False})
+            if post_data == POST_DATA_NOT_SENT:
+                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': POST_DATA_NOT_SENT})
             else:
                 job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', post_data)})
             # Print the first result
