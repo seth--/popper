@@ -171,6 +171,10 @@ class Popper():
                      (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]
         if args['postdata']:
             post_data = args['postdata']
+        elif args['post']:
+            # If CURLOPT_POST is set to 1, CURLOPT_POSTFIELDS must be present
+            # See curl.haxx.se/libcurl/c/CURLOPT_POST.html
+            post_data = ''  
         else:
             post_data = POST_DATA_NOT_SENT
         if args['method']:
