@@ -67,6 +67,7 @@ class WorkerThread(threading.Thread):
                             break
                     else:
                         self._result_list.put({'url': job['url'],
+                                               'post_data': job['post_data'],
                                                'time': self._curl.getinfo(pycurl.TOTAL_TIME) - self._curl.getinfo(pycurl.PRETRANSFER_TIME),
                                                'code': self._curl.getinfo(pycurl.RESPONSE_CODE),
                                                'size': len(self._curl_buffer),
@@ -101,23 +102,40 @@ class Popper():
         else:
             yield {'url': url_template, 'post_data': post_data_template}
 
-    def print_result(self, result):
+    def bytes_to_human(self, num):
+        # Takes a size in bytes and makes it human readable
+        format = '{0:d}{1}'
+        for x in ['B','KB','MB','GB']:
+            if num < 1024.0:
+                return format.format(num, x)
+            num /= 1024.0
+            format = '{0:.1f}{1}'
+        return format.format(num, 'TB')
+
+    def print_result(self, result, format):
         if result == JOB_STATUS_HIDDEN:
             self._hidden_results += 1
         elif result == JOB_STATUS_ABORTED:
             self._aborted_jobs += 1
+        elif format == 'table':
+            format_string = '{0:>3d} | {1:>6d} | {2:>8s} | {3:>7.3f} | '
+            if result['post_data'] != POST_DATA_NOT_SENT:
+                format_string += '{5} | '
+            format_string += '{4}\n'
+            print(format_string.format(result['code'],
+                                       result['lines'],
+                                       self.bytes_to_human(result['size']),
+                                       result['time'],
+                                       result['url'],
+                                       result['post_data']), end='')
         else:
-            # TODO: lines should be /1000 and add 'k' to save space
-            # TODO: size should use kb, mb, etc to save space
-            # TODO: what happens with long waits in time? also, the format is wrong
-            print(str(result['code']).ljust(3) + ' ' + \
-                  str(result['lines']).ljust(4) + ' ' + \
-                  str(result['size']).ljust(8) + ' ' + \
-                  str(result['time']).ljust(8) + ' ' + \
-                  result['url'] + "\n", end='')
+            if format == 'csv':
+                pass
+            elif format == 'json':
+                pass
 
     #Prints results while waiting to add a job
-    def put_job_and_print(self, result_list, job_pool, job):
+    def put_job_and_print(self, result_list, format, job_pool, job):
             success = False
             while success == False:
                 try:
@@ -126,7 +144,7 @@ class Popper():
                 except Queue.Full:
                     pass
                 try:
-                    self.print_result(result_list.get_nowait())
+                    self.print_result(result_list.get_nowait(), format)
                 except Queue.Empty:
                     pass
 
@@ -144,6 +162,7 @@ class Popper():
 
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
         parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
+        parser.add_argument('--output', type=str, default='table', choices=['table','json','csv'], help='output format')
 
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
@@ -180,6 +199,12 @@ class Popper():
         if args['method']:
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
 
+        if args['output'] == 'table':
+            print('Code|  Lines |   Size   |   Time  | ', end='')
+            if post_data != POST_DATA_NOT_SENT:
+                print('Post | ', end='')
+            print('URL')
+
         self._hidden_results = 0
         self._aborted_jobs = 0
         job_pool = Queue.Queue(args['threads'] * 10)
@@ -212,22 +237,22 @@ class Popper():
             else:
                 job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', post_data)})
             # Print the first result
-            self.print_result(result_list.get())
+            self.print_result(result_list.get(), args['output'])
 
             # Add all the urls to the queue
             for x in self.generate_jobs(args['url'], post_data, args):
-                self.put_job_and_print(result_list, job_pool, x)
+                self.put_job_and_print(result_list, args['output'], job_pool, x)
 
             # When the threads get this, they will exit
             # TODO: change this (using threading.Event()? can it be made thread safe to avoid blocking on job_list.get()?)
             for x in xrange(args['threads']):
-                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
+                self.put_job_and_print(result_list, args['output'], job_pool, NO_URLS_LEFT)
 
             # Wait for all jobs to be finished while showing results
             # This may exit with threads still alive, but those have already got NO_URLS_LEFT and are exiting
             while job_pool.empty() == False:
                 try:
-                    self.print_result(result_list.get_nowait())
+                    self.print_result(result_list.get_nowait(), args['output'])
                     time.sleep(0.1)
                 except Queue.Empty:
                     pass
@@ -237,11 +262,11 @@ class Popper():
             abort_event.set()
             # Make sure no thread locks waiting for a job
             for x in xrange(args['threads']):
-                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
+                self.put_job_and_print(result_list, args['output'], job_pool, NO_URLS_LEFT)
 
         # Finish showing results
         while result_list.empty() == False:
-            self.print_result(result_list.get_nowait())
+            self.print_result(result_list.get_nowait(), args['output'])
 
         print("\nHidden: " + str(self._hidden_results) + "\n", end='')
         if self._aborted_jobs > 0:
