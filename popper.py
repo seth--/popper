@@ -42,14 +42,13 @@ class WorkerThread(threading.Thread):
         global result_list
 
         job = self._job_pool.get()
-        while (job != NO_URLS_LEFT) and \
-              (not self._abort_event.is_set()):
-
+        while (job != NO_URLS_LEFT):
             self._curl.setopt(pycurl.URL, job['url'])
             if job['post_data'] != False:
                 self._curl.setopt(pycurl.POSTFIELDS, job['post_data']) # This must be set after pycurl.HTTPGET, pycurl.POST and pycurl.NOBODY
             retries = self._maximum_retries # Restart retry counter
-            while (retries > 0) or (self._maximum_retries == 0): # self._maximum_retries == 0 means unlimited retries
+            while ((retries > 0) or (self._maximum_retries == 0)) and \
+                (not self._abort_event.is_set()): # self._maximum_retries == 0 means unlimited retries
                 try:
                     self._curl.perform()
                 except pycurl.error, e:
@@ -212,7 +211,7 @@ class Popper():
                 self.put_job_and_print(result_list, job_pool, x)
 
             # When the threads get this, they will exit
-            # TODO: change this
+            # TODO: change this (using threading.Event()? can it be made thread safe to avoid blocking on job_list.get()?)
             for x in xrange(args['threads']):
                 self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
 
@@ -228,6 +227,9 @@ class Popper():
         except KeyboardInterrupt:
             print('Aborting threads...' + "\n", end='', file=sys.stderr)
             abort_event.set()
+            # Make sure no thread locks waiting for a job
+            for x in xrange(args['threads']):
+                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
 
         # Finish showing results
         while result_list.empty() == False:
