@@ -17,18 +17,22 @@ class InvalidVar:
 
 
 class Range():
-    CLI_HELP = 'min and max values for [range] separated by a comma (--range 1,10)'
+    CLI_HELP = 'from, to and step (optional) values for [range] separated by a comma (--range 1,10,2)'
 
     def __init__(self, vars):
         try:
             vars = vars.pop(0).split(',')
             self._min = int(vars[0])
             self._max = int(vars[1]) + 1
+            try:
+                self._step = int(vars[2])
+            except IndexError:
+                self._step = 1
         except Exception:
             raise InvalidVar
 
     def get_data(self):
-        for x in xrange(self._min, self._max): #TODO: add step
+        for x in xrange(self._min, self._max, self._step):
             yield str(x)
 
 
