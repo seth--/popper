@@ -25,9 +25,10 @@ NO_URLS_LEFT = False
 
 class WorkerThread(threading.Thread):
 
-    def __init__(self, job_pool, result_list, filter_list, maximum_retries, curl_opts):
+    def __init__(self, job_pool, abort_event, result_list, filter_list, maximum_retries, curl_opts):
         super(WorkerThread, self).__init__()
         self._job_pool = job_pool
+        self._abort_event = abort_event
         self._result_list = result_list
         self._filter_list = filter_list
         self._maximum_retries = maximum_retries
@@ -48,7 +49,8 @@ class WorkerThread(threading.Thread):
         global result_list
 
         job = self._job_pool.get()
-        while job != NO_URLS_LEFT:
+        while (job != NO_URLS_LEFT) and \
+              (not self._abort_event.is_set()):
             self._curl.setopt(pycurl.URL, job)
             retries = self._maximum_retries # Restart retry counter
             while (retries > 0) or (self._maximum_retries == 0): # self._maximum_retries == 0 means unlimited retries
@@ -75,7 +77,6 @@ class WorkerThread(threading.Thread):
             job = self._job_pool.get()
         self._curl.close()
         self._job_pool.task_done()
-
 
 
 class Popper():
@@ -180,26 +181,34 @@ class Popper():
                     filter_list.append(filter)
             except IndexError:
                 pass
-        for x in xrange(args['threads']):
-           WorkerThread(job_pool, result_list, filter_list, args['retry'], curl_opts).start()
 
-        # Add all the urls to the queue
-        for x in self.generate_urls(args['url'], args):
-            self.put_job_and_print(result_list, job_pool, x)
+        try:
+            # Start all the threads
+            abort_event = threading.Event()
+            for x in xrange(args['threads']):
+               WorkerThread(job_pool, abort_event, result_list, filter_list, args['retry'], curl_opts).start()
 
-        # When the threads get this, they will exit
-        # TODO: change this
-        for x in xrange(args['threads']):
-            self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
+            # Add all the urls to the queue
+            for x in self.generate_urls(args['url'], args):
+                self.put_job_and_print(result_list, job_pool, x)
 
-        # Wait for all jobs to be finished while showing results
-        # This may exit with threads still alive, but those have already got NO_URLS_LEFT and are exiting
-        while job_pool.empty() == False:
-            try:
-                self.print_result(result_list.get_nowait())
-                time.sleep(0.1)
-            except Queue.Empty:
-                pass
+            # When the threads get this, they will exit
+            # TODO: change this
+            for x in xrange(args['threads']):
+                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
+
+            # Wait for all jobs to be finished while showing results
+            # This may exit with threads still alive, but those have already got NO_URLS_LEFT and are exiting
+            while job_pool.empty() == False:
+                try:
+                    self.print_result(result_list.get_nowait())
+                    time.sleep(0.1)
+                except Queue.Empty:
+                    pass
+
+        except KeyboardInterrupt:
+            print('Aborting threads...', file=sys.stderr)
+            abort_event.set()
 
         # Finish showing results
         while result_list.empty() == False:
