@@ -51,7 +51,7 @@ class WorkerThread(threading.Thread):
 
             while ((retries > 0) or (self._maximum_retries == 0)) and \
                 (not self._abort_event.is_set()): # self._maximum_retries == 0 means unlimited retries
-                
+
                 try:
                     self._curl.perform()
                 except pycurl.error, e:
@@ -135,9 +135,10 @@ class Popper():
         parser = argparse.ArgumentParser(description='')
         parser.add_argument('url', type=str, help='an integer for the accumulator')
         parser.add_argument('--postdata', type=str, help='encoded post data. Implies --post')
-        parser.add_argument('--get', action='store_true', help='uses GET method')
-        parser.add_argument('--post', action='store_true', help='uses POST method')
-        parser.add_argument('--head', action='store_true', help='uses HEAD method') #TODO: make these mutually exclusive
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument('--get', action='store_true', help='uses GET method')
+        group.add_argument('--post', action='store_true', help='uses POST method')
+        group.add_argument('--head', action='store_true', help='uses HEAD method')
         parser.add_argument('--header', type=str, default=[], nargs='*', help='extra http headers (--header "foo: bar" "baz: qux")')
         parser.add_argument('--method', type=str, help='custom http method, useful for DELETE or PUT (see CURLOPT_CUSTOMREQUEST)')
 
