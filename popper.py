@@ -62,7 +62,7 @@ class WorkerThread(threading.Thread):
                 else:
                     retries = 0
                     for filter in self._filter_list:
-                        if (not filter.filter(job['url'], self._curl, self._curl_buffer)) != filter.negate: # != is logical xor for booleans
+                        if (not filter.filter(self._curl, self._curl_buffer)) != filter.negate: # != is logical xor for booleans
                             self._result_list.put(JOB_STATUS_HIDDEN)
                             break
                     else:

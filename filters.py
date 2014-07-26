@@ -25,10 +25,9 @@ class Code(BaseFilter):
             raise InvalidVar
 
     #Returns true if the url should be shown
-    #url = 'http://foo/bar'
     #curl = curl object after calling perform()
     #file = the response body including headers
-    def filter(self, url, curl, file):
+    def filter(self, curl, file):
         return not curl.getinfo(pycurl.RESPONSE_CODE) in self._hide_codes
 
 
@@ -44,7 +43,7 @@ class Time(BaseFilter):
         except:
             raise InvalidVar
 
-    def filter(self, url, curl, file):
+    def filter(self, curl, file):
         return (curl.getinfo(pycurl.TOTAL_TIME) - curl.getinfo(pycurl.PRETRANSFER_TIME)) > self._seconds
 
 
@@ -60,7 +59,7 @@ class Lines(BaseFilter):
         except:
             raise InvalidVar
 
-    def filter(self, url, curl, file):
+    def filter(self, curl, file):
         return not file.count("\n") in self._lines
 
 
@@ -76,7 +75,7 @@ class LinesOrMore(BaseFilter):
         except:
             raise InvalidVar
 
-    def filter(self, url, curl, file):
+    def filter(self, curl, file):
         return not (file.count("\n") > self._lines)
 
 
