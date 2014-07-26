@@ -77,14 +77,15 @@ class Popper():
 
     # Transforms an url with placeholders in lots of urls with the payloads applied
     def generate_jobs(self, url_template, post_data_template, args):
-        match = re.search('\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]', url_template)
+        regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
+        match = re.search(regex, url_template)
         if match:
             p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
             for data in p.get_data():
                 for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)): #TODO: deepcopy() just works. Probably something is wrong
                     yield {'url': x['url'], 'post_data': x['post_data']}
         elif post_data_template != False:
-            match = re.search('\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]', post_data_template)
+            match = re.search(regex, post_data_template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
                 for data in p.get_data():
@@ -190,6 +191,15 @@ class Popper():
             abort_event = threading.Event()
             for x in xrange(args['threads']):
                WorkerThread(job_pool, abort_event, result_list, filter_list, args['retry'], curl_opts).start()
+
+            # Add the base url to the queue
+            regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
+            if post_data == False:
+                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': False})
+            else:
+                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', post_data)})
+            # Print the first result
+            self.print_result(result_list.get())
 
             # Add all the urls to the queue
             for x in self.generate_jobs(args['url'], post_data, args):
