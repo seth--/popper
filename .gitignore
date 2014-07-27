@@ -34,5 +34,6 @@ nosetests.xml
 #Mr Developer
 .mr.developer.cfg
 
-
-
+# Sublime text
+*.sublime-project
+*.sublime-workspace
