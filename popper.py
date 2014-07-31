@@ -152,7 +152,7 @@ class Popper():
         # Parse argv
         parser = argparse.ArgumentParser(description='')
         parser.add_argument('url', type=str, help='an integer for the accumulator')
-        parser.add_argument('--postdata', type=str, help='encoded post data. Implies --post')
+        parser.add_argument('--postdata', type=str, default=POST_DATA_NOT_SENT, help='encoded post data. Implies --post')
         group = parser.add_mutually_exclusive_group()
         group.add_argument('--get', action='store_true', help='uses GET method')
         group.add_argument('--post', action='store_true', help='uses POST method')
@@ -178,6 +178,7 @@ class Popper():
 
         args = vars(parser.parse_args())
 
+        # Curl options
         curl_opts = [(pycurl.HTTPGET, args['get']),
                      (pycurl.POST, args['post']),
                      (pycurl.NOBODY, args['head']),
@@ -187,23 +188,23 @@ class Popper():
                      (pycurl.CONNECTTIMEOUT, args['connect_timeout']),
                      (pycurl.FORBID_REUSE, args['fresh']),
                      (pycurl.SSL_VERIFYPEER, (0 if args['no_verify'] else 1)),
-                     (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]
-        if args['postdata']:
-            post_data = args['postdata']
-        elif args['post']:
-            # If CURLOPT_POST is set to 1, CURLOPT_POSTFIELDS must be present
-            # See curl.haxx.se/libcurl/c/CURLOPT_POST.html
-            post_data = ''  
-        else:
-            post_data = POST_DATA_NOT_SENT
+                     (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]       
         if args['method']:
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
+        
+        # postdata is different because it can have payloads
+        # If CURLOPT_POST is set to 1, CURLOPT_POSTFIELDS must be present
+        # See curl.haxx.se/libcurl/c/CURLOPT_POST.html
+        if (args['postdata'] == POST_DATA_NOT_SENT) and args['post']:
+            args['postdata'] = ''  
+
 
         if args['output'] == 'table':
             print('Code|  Lines |   Size   |   Time  | ', end='')
-            if post_data != POST_DATA_NOT_SENT:
+            if args['postdata'] != POST_DATA_NOT_SENT:
                 print('Post | ', end='')
             print('URL')
+
 
         self._hidden_results = 0
         self._aborted_jobs = 0
@@ -232,15 +233,15 @@ class Popper():
 
             # Add the base url to the queue
             regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
-            if post_data == POST_DATA_NOT_SENT:
+            if args['postdata'] == POST_DATA_NOT_SENT:
                 job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': POST_DATA_NOT_SENT})
             else:
-                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', post_data)})
+                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', args['postdata'])})
             # Print the first result
             self.print_result(result_list.get(), args['output'])
 
             # Add all the urls to the queue
-            for x in self.generate_jobs(args['url'], post_data, args):
+            for x in self.generate_jobs(args['url'], args['postdata'], args):
                 self.put_job_and_print(result_list, args['output'], job_pool, x)
 
             # When the threads get this, they will exit
