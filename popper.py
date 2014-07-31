@@ -88,14 +88,14 @@ class Popper():
         if match:
             p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
             for data in p.get_data():
-                for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)): #TODO: deepcopy() just works. Probably something is wrong
+                for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)): 
                     yield {'url': x['url'], 'post_data': x['post_data']}
         elif post_data_template != POST_DATA_NOT_SENT:
             match = re.search(regex, post_data_template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
                 for data in p.get_data():
-                    for x in self.generate_jobs(url_template, post_data_template.replace(match.group(0), data, 1), copy.deepcopy(args)): #TODO: deepcopy() just works. Probably something is wrong
+                    for x in self.generate_jobs(url_template, post_data_template.replace(match.group(0), data, 1), copy.deepcopy(args)): 
                         yield {'url': x['url'], 'post_data': x['post_data']}
             else:
                 yield {'url': url_template, 'post_data': post_data_template}
