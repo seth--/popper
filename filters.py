@@ -1,4 +1,6 @@
 import pycurl
+import re
+
 
 class InvalidVar:
     pass
@@ -79,8 +81,28 @@ class LinesOrMore(BaseFilter):
         return not (file.count("\n") > self._lines)
 
 
+class Grep(BaseFilter):
+    @staticmethod
+    def set_arguments(parser):
+        parser.add_argument('--grep', type=str, default=None, nargs='*', help='Show results matching a regular expression')
+
+    def __init__(self, vars):
+        BaseFilter.__init__(self)
+        try:
+            self._regex = vars
+        except:
+            raise InvalidVar
+
+    def filter(self, curl, file):
+        for regex in self._regex:
+            if re.search(regex, file):
+                return True
+        return False
+
+
 FILTER_MAPING = {'hc': Code,
                  'ht': Time,
                  'hl': Lines,
-                 'hl+': LinesOrMore}
+                 'hl+': LinesOrMore,
+                 'grep': Grep}
 
