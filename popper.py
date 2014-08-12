@@ -226,17 +226,27 @@ class Popper():
                 except Queue.Empty:
                     pass
 
-        except KeyboardInterrupt: #TODO: this should handle other exceptions
+            # Finish showing results
+            while result_list.empty() == False:
+                self._output.print_result(result_list.get_nowait())
+
+            self._output.print_summary()
+
+        except KeyboardInterrupt:
             print('Aborting threads...' + "\n", end='', file=sys.stderr)
             abort_event.set()
             # Make sure no thread locks waiting for a job
             for x in xrange(args['threads']):
-                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
+                job_pool.put(NO_URLS_LEFT)
+            self._output.print_summary()
 
-        # Finish showing results
-        while result_list.empty() == False:
-            self._output.print_result(result_list.get_nowait())
+        except:
+            # TODO: remove repeated code
+            abort_event.set()
+            # Make sure no thread locks waiting for a job
+            for x in xrange(args['threads']):
+                job_pool.put(NO_URLS_LEFT)
+            raise
 
-        self._output.print_summary()
 
 Popper()
