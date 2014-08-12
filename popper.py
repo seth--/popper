@@ -10,11 +10,8 @@ import sys
 
 from payloads import PAYLOAD_MAPING
 from filters import FILTER_MAPING
-
-NO_URLS_LEFT = False
-POST_DATA_NOT_SENT = False
-JOB_STATUS_HIDDEN = 1
-JOB_STATUS_ABORTED = 2
+import output
+from constants import *
 
 
 class WorkerThread(threading.Thread):
@@ -45,7 +42,7 @@ class WorkerThread(threading.Thread):
             self._curl.setopt(pycurl.URL, job['url'])
             if job['post_data'] != POST_DATA_NOT_SENT:
                 # This must be set after pycurl.HTTPGET, pycurl.POST and pycurl.NOBODY
-                self._curl.setopt(pycurl.POSTFIELDS, job['post_data']) 
+                self._curl.setopt(pycurl.POSTFIELDS, job['post_data'])
             # Restart retry counter
             retries = self._maximum_retries
 
@@ -61,17 +58,21 @@ class WorkerThread(threading.Thread):
                         self._result_list.put(JOB_STATUS_ABORTED)
                 else:
                     retries = 0
+                    result = [{'name': 'url', 'value': job['url']},
+                              {'name': 'post_data', 'value': job['post_data']},
+                              {'name': 'time', 'value': self._curl.getinfo(pycurl.TOTAL_TIME) - self._curl.getinfo(pycurl.PRETRANSFER_TIME)},
+                              {'name': 'code', 'value': self._curl.getinfo(pycurl.RESPONSE_CODE)},
+                              {'name': 'size', 'value': len(self._curl_buffer)},
+                              {'name': 'lines', 'value': self._curl_buffer.count("\n")}]
+
                     for filter in self._filter_list:
-                        if (not filter.filter(self._curl, self._curl_buffer)) != filter.negate: # != is logical xor for booleans
+                        filter_result = filter.filter(self._curl, self._curl_buffer)
+                        if (not bool(filter_result)) != filter.negate: # != is logical xor for booleans
                             self._result_list.put(JOB_STATUS_HIDDEN)
                             break
+                        result.append(filter_result)
                     else:
-                        self._result_list.put({'url': job['url'],
-                                               'post_data': job['post_data'],
-                                               'time': self._curl.getinfo(pycurl.TOTAL_TIME) - self._curl.getinfo(pycurl.PRETRANSFER_TIME),
-                                               'code': self._curl.getinfo(pycurl.RESPONSE_CODE),
-                                               'size': len(self._curl_buffer),
-                                               'lines': self._curl_buffer.count("\n")})
+                        self._result_list.put(result)
             self._curl_buffer = ''
             self._job_pool.task_done()
             job = self._job_pool.get()
@@ -88,54 +89,22 @@ class Popper():
         if match:
             p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
             for data in p.get_data():
-                for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)): 
+                for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)):
                     yield {'url': x['url'], 'post_data': x['post_data']}
         elif post_data_template != POST_DATA_NOT_SENT:
             match = re.search(regex, post_data_template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
                 for data in p.get_data():
-                    for x in self.generate_jobs(url_template, post_data_template.replace(match.group(0), data, 1), copy.deepcopy(args)): 
+                    for x in self.generate_jobs(url_template, post_data_template.replace(match.group(0), data, 1), copy.deepcopy(args)):
                         yield {'url': x['url'], 'post_data': x['post_data']}
             else:
                 yield {'url': url_template, 'post_data': post_data_template}
         else:
             yield {'url': url_template, 'post_data': post_data_template}
 
-    def bytes_to_human(self, num):
-        # Takes a size in bytes and makes it human readable
-        format = '{0:d}{1}'
-        for x in ['B','KB','MB','GB']:
-            if num < 1024.0:
-                return format.format(num, x)
-            num /= 1024.0
-            format = '{0:.1f}{1}'
-        return format.format(num, 'TB')
-
-    def print_result(self, result, format):
-        if result == JOB_STATUS_HIDDEN:
-            self._hidden_results += 1
-        elif result == JOB_STATUS_ABORTED:
-            self._aborted_jobs += 1
-        elif format == 'table':
-            format_string = '{0:>3d} | {1:>6d} | {2:>8s} | {3:>7.3f} | '
-            if result['post_data'] != POST_DATA_NOT_SENT:
-                format_string += '{5} | '
-            format_string += '{4}\n'
-            print(format_string.format(result['code'],
-                                       result['lines'],
-                                       self.bytes_to_human(result['size']),
-                                       result['time'],
-                                       result['url'],
-                                       result['post_data']), end='')
-        else:
-            if format == 'csv':
-                pass
-            elif format == 'json':
-                pass
-
     #Prints results while waiting to add a job
-    def put_job_and_print(self, result_list, format, job_pool, job):
+    def put_job_and_print(self, result_list, job_pool, job):
             success = False
             while success == False:
                 try:
@@ -144,7 +113,7 @@ class Popper():
                 except Queue.Full:
                     pass
                 try:
-                    self.print_result(result_list.get_nowait(), format)
+                    self._output.print_result(result_list.get_nowait())
                 except Queue.Empty:
                     pass
 
@@ -163,6 +132,7 @@ class Popper():
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
         parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
         parser.add_argument('--output', type=str, default='table', choices=['table','json','csv'], help='output format')
+        parser.add_argument('--columns', type=str, default=[], nargs='*', help='Columns to output')
 
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
@@ -188,26 +158,24 @@ class Popper():
                      (pycurl.CONNECTTIMEOUT, args['connect_timeout']),
                      (pycurl.FORBID_REUSE, args['fresh']),
                      (pycurl.SSL_VERIFYPEER, (0 if args['no_verify'] else 1)),
-                     (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]       
+                     (pycurl.SSL_VERIFYHOST, (0 if args['no_verify'] else 2))]
         if args['method']:
             curl_opts.append((pycurl.CUSTOMREQUEST, args['method']))
-        
+
         # postdata is different because it can have payloads
         # If CURLOPT_POST is set to 1, CURLOPT_POSTFIELDS must be present
         # See curl.haxx.se/libcurl/c/CURLOPT_POST.html
         if (args['postdata'] == POST_DATA_NOT_SENT) and args['post']:
-            args['postdata'] = ''  
+            args['postdata'] = ''
 
-
+        # This formats the output
         if args['output'] == 'table':
-            print('Code|  Lines |   Size   |   Time  | ', end='')
-            if args['postdata'] != POST_DATA_NOT_SENT:
-                print('Post | ', end='')
-            print('URL')
+            self._output = output.Table()
+        else:
+            print('Not implemented')
+            sys.exit()
 
-
-        self._hidden_results = 0
-        self._aborted_jobs = 0
+        # Initialize variables
         job_pool = Queue.Queue(args['threads'] * 10)
         result_list = Queue.Queue(0)
 
@@ -238,40 +206,37 @@ class Popper():
             else:
                 job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', args['postdata'])})
             # Print the first result
-            self.print_result(result_list.get(), args['output'])
+            self._output.print_result(result_list.get())
 
             # Add all the urls to the queue
             for x in self.generate_jobs(args['url'], args['postdata'], args):
-                self.put_job_and_print(result_list, args['output'], job_pool, x)
+                self.put_job_and_print(result_list, job_pool, x)
 
             # When the threads get this, they will exit
             # TODO: change this (using threading.Event()? can it be made thread safe to avoid blocking on job_list.get()?)
             for x in xrange(args['threads']):
-                self.put_job_and_print(result_list, args['output'], job_pool, NO_URLS_LEFT)
+                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
 
             # Wait for all jobs to be finished while showing results
             # This may exit with threads still alive, but those have already got NO_URLS_LEFT and are exiting
             while job_pool.empty() == False:
                 try:
-                    self.print_result(result_list.get_nowait(), args['output'])
+                    self._output.print_result(result_list.get_nowait())
                     time.sleep(0.1)
                 except Queue.Empty:
                     pass
 
-        except KeyboardInterrupt:
+        except KeyboardInterrupt: #TODO: this should handle other exceptions
             print('Aborting threads...' + "\n", end='', file=sys.stderr)
             abort_event.set()
             # Make sure no thread locks waiting for a job
             for x in xrange(args['threads']):
-                self.put_job_and_print(result_list, args['output'], job_pool, NO_URLS_LEFT)
+                self.put_job_and_print(result_list, job_pool, NO_URLS_LEFT)
 
         # Finish showing results
         while result_list.empty() == False:
-            self.print_result(result_list.get_nowait(), args['output'])
+            self._output.print_result(result_list.get_nowait())
 
-        print("\nHidden: " + str(self._hidden_results) + "\n", end='')
-        if self._aborted_jobs > 0:
-            print("Aborted jobs: " + str(self._aborted_jobs) + "\n", end='')
-
+        self._output.print_summary()
 
 Popper()

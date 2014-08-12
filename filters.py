@@ -81,10 +81,10 @@ class LinesOrMore(BaseFilter):
         return not (file.count("\n") > self._lines)
 
 
-class Grep(BaseFilter):
+class Regex(BaseFilter):
     @staticmethod
     def set_arguments(parser):
-        parser.add_argument('--grep', type=str, default=None, nargs='*', help='Show results matching a regular expression')
+        parser.add_argument('--regex', type=str, default=None, help='Show results matching a regular expression')
 
     def __init__(self, vars):
         BaseFilter.__init__(self)
@@ -94,15 +94,16 @@ class Grep(BaseFilter):
             raise InvalidVar
 
     def filter(self, curl, file):
-        for regex in self._regex:
-            if re.search(regex, file):
-                return True
-        return False
+        match = re.search(self._regex, file)
+        if match:
+            return {'name': 'regex', 'value': match.group()}
+        else:
+            return False
 
 
 FILTER_MAPING = {'hc': Code,
                  'ht': Time,
                  'hl': Lines,
                  'hl+': LinesOrMore,
-                 'grep': Grep}
+                 'regex': Regex}
 
