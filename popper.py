@@ -40,6 +40,7 @@ class WorkerThread(threading.Thread):
         job = self._job_pool.get()
         while (job != NO_URLS_LEFT):
             self._curl.setopt(pycurl.URL, job['url'])
+            self._curl.setopt(pycurl.HTTPHEADER, job['header'])
             if job['post_data'] != POST_DATA_NOT_SENT:
                 # This must be set after pycurl.HTTPGET, pycurl.POST and pycurl.NOBODY
                 self._curl.setopt(pycurl.POSTFIELDS, job['post_data'])
@@ -60,6 +61,7 @@ class WorkerThread(threading.Thread):
                     retries = 0
                     result = [{'name': 'url', 'value': job['url']},
                               {'name': 'post_data', 'value': job['post_data']},
+                              {'name': 'header', 'value': job['header']},
                               {'name': 'time', 'value': self._curl.getinfo(pycurl.TOTAL_TIME) - self._curl.getinfo(pycurl.PRETRANSFER_TIME)},
                               {'name': 'code', 'value': self._curl.getinfo(pycurl.RESPONSE_CODE)},
                               {'name': 'size', 'value': len(self._curl_buffer)},
@@ -83,25 +85,23 @@ class WorkerThread(threading.Thread):
 class Popper():
 
     # Transforms an url with placeholders in lots of urls with the payloads applied
-    def generate_jobs(self, url_template, post_data_template, args):
+    # It uses lists instead of dictionaries because it's way easier to work with multiple headers
+    def generate_jobs(self, templates, args):
         regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
-        match = re.search(regex, url_template)
-        if match:
-            p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
-            for data in p.get_data():
-                for x in self.generate_jobs(url_template.replace(match.group(0), data, 1), post_data_template, copy.deepcopy(args)):
-                    yield {'url': x['url'], 'post_data': x['post_data']}
-        elif post_data_template != POST_DATA_NOT_SENT:
-            match = re.search(regex, post_data_template)
+        for i, template in enumerate(templates):
+            if not isinstance(template, str): # For POST_DATA_NOT_SENT
+                continue
+            match = re.search(regex, template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
                 for data in p.get_data():
-                    for x in self.generate_jobs(url_template, post_data_template.replace(match.group(0), data, 1), copy.deepcopy(args)):
-                        yield {'url': x['url'], 'post_data': x['post_data']}
-            else:
-                yield {'url': url_template, 'post_data': post_data_template}
+                    templates_copy = templates[:]
+                    templates_copy[i] = templates_copy[i].replace(match.group(0), data, 1)
+                    for x in self.generate_jobs(templates_copy, copy.deepcopy(args)):
+                        yield x
+                break
         else:
-            yield {'url': url_template, 'post_data': post_data_template}
+            yield templates
 
     #Prints results while waiting to add a job
     def put_job_and_print(self, result_list, job_pool, job):
@@ -152,7 +152,6 @@ class Popper():
         curl_opts = [(pycurl.HTTPGET, args['get']),
                      (pycurl.POST, args['post']),
                      (pycurl.NOBODY, args['head']),
-                     (pycurl.HTTPHEADER, args['header']),
                      (pycurl.PROXY, args['proxy']),
                      (pycurl.TIMEOUT, args['timeout']),
                      (pycurl.CONNECTTIMEOUT, args['connect_timeout']),
@@ -202,15 +201,22 @@ class Popper():
             # Add the base url to the queue
             regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
             if args['postdata'] == POST_DATA_NOT_SENT:
-                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': POST_DATA_NOT_SENT})
+                first_post_data = POST_DATA_NOT_SENT
             else:
-                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': re.sub(regex, '', args['postdata'])})
+                first_post_data = re.sub(regex, '', args['postdata'])
+
+            first_header = []
+            for x in args['header']:
+                first_header.append(re.sub(regex, '', x))
+
+            job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': first_post_data, 'header': first_header})
+
             # Print the first result
             self._output.print_result(result_list.get())
 
             # Add all the urls to the queue
-            for x in self.generate_jobs(args['url'], args['postdata'], args):
-                self.put_job_and_print(result_list, job_pool, x)
+            for x in self.generate_jobs([args['url'], args['postdata']] + args['header'], args):
+                self.put_job_and_print(result_list, job_pool, {'url': x[0], 'post_data': x[1], 'header': x[2:]})
 
             # When the threads get this, they will exit
             # TODO: change this (using threading.Event()? can it be made thread safe to avoid blocking on job_list.get()?)

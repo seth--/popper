@@ -20,7 +20,7 @@ class Table():
 
     def _sort(self, field):
         # Used as key argument for sorted()
-        order = ['code', 'lines', 'size', 'time', None, 'url', 'post_data']
+        order = ['code', 'lines', 'size', 'time', None, 'url', 'post_data', 'header']
         if field['name'] in order:
             return order.index(field['name'])
         else:
@@ -37,6 +37,8 @@ class Table():
         for field in result:
             # Spcial case
             if (field['name'] == 'post_data') and (field['value'] == POST_DATA_NOT_SENT):
+                continue
+            elif (field['name'] == 'header') and (len(field['value']) == 0):
                 continue
 
             if 'width' in field:
@@ -71,6 +73,12 @@ class Table():
                     field['value'] = self._bytes_to_human(field['value'])
                 elif (field['name'] == 'post_data') and (field['value'] == POST_DATA_NOT_SENT):
                     continue
+                elif field['name'] == 'header':
+                    if len(field['value']) == 0:
+                        continue
+                    else:
+                        field['value'] = "\r\n".join(field['value'])
+
 
                 if field['name'] in formats:
                     format = formats[field['name']]
