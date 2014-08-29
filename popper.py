@@ -72,7 +72,13 @@ class WorkerThread(threading.Thread):
                         if (not bool(filter_result)) != filter.negate: # != is logical xor for booleans
                             self._result_list.put(JOB_STATUS_HIDDEN)
                             break
-                        result.append(filter_result)
+
+                        try: #Don't show True
+                            filter_result['name']
+                            filter_result['value']
+                            result.append(filter_result)
+                        except TypeError:
+                            pass
                     else:
                         self._result_list.put(result)
             self._curl_buffer = ''
