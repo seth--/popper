@@ -7,6 +7,7 @@ class Table():
         self._hidden_results = 0
         self._aborted_jobs = 0
         self._first_line = True
+        self.hide = []
 
     def _bytes_to_human(self, num):
         # Takes a size in bytes and makes it human readable
@@ -40,6 +41,8 @@ class Table():
                 continue
             elif (field['name'] == 'header') and (len(field['value']) == 0):
                 continue
+            elif field['name'] in self.hide:
+                continue
 
             if 'width' in field:
                 width = field['width']
@@ -69,15 +72,17 @@ class Table():
             output = []
             for field in result:
                 # Special cases:
-                if field['name'] == 'size':
-                    field['value'] = self._bytes_to_human(field['value'])
-                elif (field['name'] == 'post_data') and (field['value'] == POST_DATA_NOT_SENT):
+                if (field['name'] == 'post_data') and (field['value'] == POST_DATA_NOT_SENT):
+                    continue
+                elif field['name'] in self.hide:
                     continue
                 elif field['name'] == 'header':
                     if len(field['value']) == 0:
                         continue
                     else:
                         field['value'] = "\r\n".join(field['value'])
+                elif field['name'] == 'size':
+                    field['value'] = self._bytes_to_human(field['value'])
 
 
                 if field['name'] in formats:

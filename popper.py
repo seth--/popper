@@ -145,7 +145,7 @@ class Popper():
         parser.add_argument('--threads', '-t', type=int, default=10, help='number of threads (default: 10)')
         parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
         parser.add_argument('--output', type=str, default='table', choices=['table','json','csv'], help='output format')
-        parser.add_argument('--columns', type=str, default=[], nargs='*', help='Columns to output')
+        parser.add_argument('--hide', type=str, default=[], nargs='*', help='Columns to hide')
 
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
@@ -186,6 +186,7 @@ class Popper():
         else:
             print('Not implemented')
             sys.exit()
+        self._output.hide = args['hide']
 
         # Initialize variables
         job_pool = Queue.Queue(args['threads'] * 10)
