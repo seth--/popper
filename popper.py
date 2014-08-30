@@ -89,6 +89,13 @@ class WorkerThread(threading.Thread):
 
 
 class Popper():
+    def _has_payload(self, templates):
+        # Add the base url to the queue
+        regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
+        for template in templates:
+            if (template != POST_DATA_NOT_SENT) and re.search(regex, template):
+                return True
+        return False
 
     # Transforms an url with placeholders in lots of urls with the payloads applied
     # It uses lists instead of dictionaries because it's way easier to work with multiple headers
@@ -205,20 +212,22 @@ class Popper():
                WorkerThread(job_pool, abort_event, result_list, filter_list, args['retry'], curl_opts).start()
 
             # Add the base url to the queue
-            regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
-            if args['postdata'] == POST_DATA_NOT_SENT:
-                first_post_data = POST_DATA_NOT_SENT
-            else:
-                first_post_data = re.sub(regex, '', args['postdata'])
+            # Only if there are payloads, to avoid having just two identical requests
+            if self._has_payload([args['url'], args['postdata']] + args['header']):
+                regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
+                if args['postdata'] == POST_DATA_NOT_SENT:
+                    first_post_data = POST_DATA_NOT_SENT
+                else:
+                    first_post_data = re.sub(regex, '', args['postdata'])
 
-            first_header = []
-            for x in args['header']:
-                first_header.append(re.sub(regex, '', x))
+                first_header = []
+                for x in args['header']:
+                    first_header.append(re.sub(regex, '', x))
 
-            job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': first_post_data, 'header': first_header})
+                job_pool.put({'url': re.sub(regex, '', args['url']), 'post_data': first_post_data, 'header': first_header})
 
-            # Print the first result
-            self._output.print_result(result_list.get())
+                # Print the first result
+                self._output.print_result(result_list.get())
 
             # Add all the urls to the queue
             for x in self.generate_jobs([args['url'], args['postdata']] + args['header'], args):
