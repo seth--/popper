@@ -84,7 +84,7 @@ class Table():
                     format = formats[field['name']]
                 else:
                     format = '{0}'
-                    field['value'] = field['value'].encode('unicode_escape')
+                    field['value'] = field['value'] = field['value'].replace("\r", "\\r").replace("\n", "\\n")
 
                 output.append(format.format(field['value']))
             print(' | '.join(output) + "\n", end='')
