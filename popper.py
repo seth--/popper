@@ -116,6 +116,11 @@ class Popper():
         else:
             yield templates
 
+    def _print_result(self, result):
+        self._output.print_result(result)
+        if self._stop_on_first and (result != JOB_STATUS_HIDDEN):
+            raise KeyboardInterrupt
+
     #Prints results while waiting to add a job
     def put_job_and_print(self, result_list, job_pool, job):
             success = False
@@ -126,7 +131,7 @@ class Popper():
                 except Queue.Full:
                     pass
                 try:
-                    self._output.print_result(result_list.get_nowait())
+                    self._print_result(result_list.get_nowait())
                 except Queue.Empty:
                     pass
 
@@ -146,6 +151,7 @@ class Popper():
         parser.add_argument('--negate', type=str, default=[], nargs='*', help='list of filter to negate (to show only 200 codes: --negate hc --hc 200)')
         parser.add_argument('--output', type=str, default='table', choices=['table','json','csv'], help='output format')
         parser.add_argument('--hide', type=str, default=[], nargs='*', help='Columns to hide')
+        parser.add_argument('--stop-on-first', action='store_true', default=False, help='Stop on first not hidden result')
 
         parser.add_argument('--retry', type=int, default=3, help='times to retry a request when something goes wrong (0 for unlimited)')
         parser.add_argument('--proxy', type=str, default='', help='[socks4|socks4a|socks5|socks5h|http]://host:port')
@@ -187,6 +193,8 @@ class Popper():
             print('Not implemented')
             sys.exit()
         self._output.hide = args['hide']
+
+        self._stop_on_first = args['stop_on_first']
 
         # Initialize variables
         job_pool = Queue.Queue(args['threads'] * 10)
@@ -243,14 +251,14 @@ class Popper():
             # This may exit with threads still alive, but those have already got NO_URLS_LEFT and are exiting
             while job_pool.empty() == False:
                 try:
-                    self._output.print_result(result_list.get_nowait())
+                    self._print_result(result_list.get_nowait())
                     time.sleep(0.1)
                 except Queue.Empty:
                     pass
 
             # Finish showing results
             while result_list.empty() == False:
-                self._output.print_result(result_list.get_nowait())
+                self._print_result(result_list.get_nowait())
 
             self._output.print_summary()
 
