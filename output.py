@@ -65,10 +65,10 @@ class Table():
             if self._first_line:
                 self._print_first_line(result)
 
-            formats = {'code': '{0:>3d}',
-                       'lines': '{0:>6d}',
-                       'size': '{0:>8s}',
-                       'time': '{0:>7.3f}'}
+            formats = {'code': '{0:>3d} ',
+                       'lines': ' {0:>6d} ',
+                       'size': ' {0:>8s} ',
+                       'time': ' {0:>7.3f} '}
             output = []
             for field in result:
                 # Special cases:
@@ -88,11 +88,11 @@ class Table():
                 if field['name'] in formats:
                     format = formats[field['name']]
                 else:
-                    format = '{0}'
+                    format = ' {0} '
                     field['value'] = field['value'] = field['value'].replace("\r", "\\r").replace("\n", "\\n")
 
                 output.append(format.format(field['value']))
-            print(' | '.join(output) + "\n", end='')
+            print('|'.join(output) + "\n", end='')
 
     def print_summary(self):
         # The last line
