@@ -133,7 +133,7 @@ class Popper():
     def __init__(self):
         # Parse argv
         parser = argparse.ArgumentParser(description='')
-        parser.add_argument('url', type=str, help='an integer for the accumulator')
+        parser.add_argument('url', type=str, help='Target url')
         parser.add_argument('--postdata', type=str, default=POST_DATA_NOT_SENT, help='encoded post data. Implies --post')
         group = parser.add_mutually_exclusive_group()
         group.add_argument('--get', action='store_true', help='uses GET method')
