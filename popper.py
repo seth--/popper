@@ -10,8 +10,12 @@ import sys
 
 from payloads import PAYLOAD_MAPING
 from filters import FILTER_MAPING
+from modifiers import MODIFIER_MAPING, DummyModifier
 import output
 from constants import *
+
+
+regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')' + '(?:\:(' + '|'.join(map(re.escape, MODIFIER_MAPING)) + '))?' + '\]'
 
 
 class WorkerThread(threading.Thread):
@@ -90,8 +94,6 @@ class WorkerThread(threading.Thread):
 
 class Popper():
     def _has_payload(self, templates):
-        # Add the base url to the queue
-        regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
         for template in templates:
             if (template != POST_DATA_NOT_SENT) and re.search(regex, template):
                 return True
@@ -100,14 +102,20 @@ class Popper():
     # Transforms an url with placeholders in lots of urls with the payloads applied
     # It uses lists instead of dictionaries because it's way easier to work with multiple headers
     def generate_jobs(self, templates, args):
-        regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
         for i, template in enumerate(templates):
             if not isinstance(template, str): # For POST_DATA_NOT_SENT
                 continue
             match = re.search(regex, template)
             if match:
                 p = PAYLOAD_MAPING[match.group(1)](args[match.group(1)])
+                #TODO: add multiple modifiers in one paylaod
+                if match.group(2) is not None:
+                    modifier = MODIFIER_MAPING[match.group(2)]()
+                else:
+                    modifier = DummyModifier()
+
                 for data in p.get_data():
+                    data = modifier.modify(data)
                     templates_copy = templates[:]
                     templates_copy[i] = templates_copy[i].replace(match.group(0), data, 1)
                     for x in self.generate_jobs(templates_copy, copy.deepcopy(args)):
@@ -223,7 +231,6 @@ class Popper():
             # Add the base url to the queue
             # Only if there are payloads, to avoid having just two identical requests
             if self._has_payload([args['url'], args['postdata']] + args['header']):
-                regex = '\[(' + '|'.join(map(re.escape, PAYLOAD_MAPING)) + ')\]'
                 if args['postdata'] == POST_DATA_NOT_SENT:
                     first_post_data = POST_DATA_NOT_SENT
                 else:
