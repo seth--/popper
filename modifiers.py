@@ -37,7 +37,7 @@ class fullUrlEncode():
     def modify(self, string):
         encoded = ''
         for i in range(0, len(string)):
-            encoded += '%' + str(ord(string[i]))
+            encoded += '%' + format(ord(string[i]), "x")
         return encoded
 
 MODIFIER_MAPING = {'int2ascii': IntToAscii, 'fullurlencode': fullUrlEncode}
