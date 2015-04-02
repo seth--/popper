@@ -1,3 +1,6 @@
+import urllib
+
+
 class DummyModifier():
     # This is the easiest way to handle the default case
     @staticmethod
@@ -40,4 +43,16 @@ class fullUrlEncode():
             encoded += '%' + format(ord(string[i]), "x")
         return encoded
 
-MODIFIER_MAPING = {'int2ascii': IntToAscii, 'fullurlencode': fullUrlEncode}
+
+class urlEncode():
+    @staticmethod
+    def set_arguments(parser):
+        pass
+
+    def __init__(self): #TODO: add arguments and help
+        pass
+
+    def modify(self, string):
+        return urllib.quote_plus(string)
+
+MODIFIER_MAPING = {'int2ascii': IntToAscii, 'fullurlencode': fullUrlEncode, 'urlencode': urlEncode}
