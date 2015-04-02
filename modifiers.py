@@ -10,6 +10,7 @@ class DummyModifier():
     def modify(self, string):
         return string
 
+
 class IntToAscii():
     @staticmethod
     def set_arguments(parser):
@@ -24,4 +25,19 @@ class IntToAscii():
         except ValueError: # For both non numeric strings and non ascii codes
             return string
 
-MODIFIER_MAPING = {'int2ascii': IntToAscii}
+
+class fullUrlEncode():
+    @staticmethod
+    def set_arguments(parser):
+        pass
+
+    def __init__(self): #TODO: add arguments and help
+        pass
+
+    def modify(self, string):
+        encoded = ''
+        for i in range(0, len(string)):
+            encoded += '%' + str(ord(string[i]))
+        return encoded
+
+MODIFIER_MAPING = {'int2ascii': IntToAscii, 'fullurlencode': fullUrlEncode}
